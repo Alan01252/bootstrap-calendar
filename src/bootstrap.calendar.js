@@ -37,6 +37,8 @@
             msg_months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
             msg_today: 'Today',
             msg_events_header: 'Events Today',
+            startDate:null,
+            endDate:null,
             events: null
         },
 
@@ -66,15 +68,17 @@
         // contents of two or more objects, storing the
         // result in the first object. The first object
         // is generally empty because we don't want to alter
-        // the default options for future instances of the plugin
+        // the default options for future instances of the pluginicon-arrow-left
         this.options = $.extend( {}, defaults, options) ;
 
         this._defaults = defaults;
         this._name = pluginName;
+        
+       
 
         this.init();
     }
-
+ 
     Plugin.prototype.init = function () {
         // Place initialization logic here
         // You already have access to the DOM element and
@@ -86,6 +90,15 @@
         this.msg_today = this.options.msg_today;        
         this.msg_events_hdr = this.options.msg_events_header;
         this.events = this.options.events;
+        
+        if(this.options.startDate) {
+        	this.startDate = this.options.startDate;
+        }
+        
+        if(this.options.endDate) {
+        	this.endDate = this.options.endDate;
+        }
+        
 
         this.calendar = $(template).appendTo(this.element).on({
                                 click: $.proxy(this.click, this)
@@ -96,10 +109,24 @@
         var now = new Date();
         this.mm = now.getMonth();
         this.yy = now.getFullYear();
+        
+        if(!this.startDate) {
+        	 var mon = new Date(this.yy, this.mm, 1);
+             this.yp = mon.getFullYear();
+             this.yn = mon.getFullYear();
+             this.dd = mon.getDate();
+        }
+        else {
+         	 var mon = this.startDate;
+             this.yp = mon.getFullYear();
+             this.yn = mon.getFullYear();
+             this.dd = 1;
+             this.mm = mon.getMonth();
+             this.yy = mon.getFullYear();
+        }
+	   
 
-        var mon = new Date(this.yy, this.mm, 1);
-        this.yp = mon.getFullYear();
-        this.yn = mon.getFullYear();
+      
 
 
         if (this.component){
@@ -150,9 +177,28 @@
         }
     };
 
+    Plugin.prototype.redraw = function(options){
+
+    	   if(options.startDate) {
+    		   this.startDate = options.startDate;
+           	   var mon = this.startDate;
+               this.yp = mon.getFullYear();
+               this.yn = mon.getFullYear();
+               this.dd = 1;
+               this.mm = mon.getMonth();
+               this.yy = mon.getFullYear();
+          }
+    	   
+    	   if(options.endDate) {
+    		   this.endDate = options.endDate;
+    	   }
+    	   
+    	   this.renderCalendar(new Date());
+    };
+    
     Plugin.prototype.renderCalendar = function (date) {
-        var mon = new Date(this.yy, this.mm, 1);
-        var live_date = this.live_date;
+        var mon = new Date(this.yy, this.mm, this.dd);
+
 
         this.element.parent('div:first').find('.year').empty();
         this.element.parent('div:first').find('.month').empty();
@@ -171,6 +217,7 @@
 
         // Render Days of Week
         this.renderDays();
+        
 
         var fdom = mon.getDay(); // First day of month
         var mwks = 6 // Weeks in month
@@ -207,8 +254,8 @@
                     if(
                         today.getDate() == date.getDate()
                         && dow == date.getDate()
-                        && date.getMonth() == date.getMonth()
-                        && date.getFullYear() == date.getFullYear()
+                        && date.getMonth() == mon.getMonth()
+                        && date.getFullYear() == mon.getFullYear()
 
                     ){
                         cls = "today";
@@ -224,13 +271,20 @@
 
                 month_ = date.getMonth() + 1;
                 year = date.getFullYear();
-
+                
+  
+                if((dow < this.startDate.getDate()  && this.startDate.getMonth() == mon.getMonth()) ||
+                	dow > this.endDate.getDate() && this.endDate.getMonth() == mon.getMonth()) {
+                	cls += " invalid ";
+                }
+                
                 // Render HTML
-                if(dow == 0){
-                    _html += '<td>&nbsp;</td>';
-                }else if(msg.length > 0){
+                if(dow === 0){
+                    _html += '<td class="invalid">&nbsp;</td>';
+                }else if(msg.length > 0) {
                     _html += '<td class="' +cls+ '" id="'+id+'" year="' + year + '" month="' + month_ + '" day="' + dow + '"><span class="weekday">' +dow+ '</span></td>';
-                }else{
+                }else {
+                	
                     _html += '<td class="' +cls+ '" id="'+id+'" year="' + year + '" month="' + month_ + '" day="' + dow + '">' +dow+ '</td>';
                 }
 
@@ -239,6 +293,31 @@
             this.calendar.find('.calendar-body').append(_html);
         }
         this.loadEvents();
+        this.disablePagination(mon);
+    };
+    
+    Plugin.prototype.disablePagination = function (month) {
+    	var newDate = new Date(month.getTime());
+
+    	console.log(newDate+" "+this.startDate);
+    	
+    	if(newDate < this.startDate){
+    		$('.calendar .icon-arrow-left').hide();
+    	}
+    	else {
+    		$('.calendar .icon-arrow-left').show();
+    	}
+    	
+    	var newDate = new Date(month.getTime());
+    	newDate.setMonth( newDate.getMonth( ) +  1);
+    	
+    	if(newDate > this.endDate){
+    		$('.calendar .icon-arrow-right').hide();
+    	}
+    	else {
+    		$('.calendar .icon-arrow-right').show();
+    	}
+    	
     };
 
     Plugin.prototype.renderDays = function () {
@@ -259,52 +338,31 @@
             if (target.length == 1) {
                 switch(target[0].nodeName.toLowerCase()) {
                     case 'td':
-                        if (target.is('.day')){
-                            var day = parseInt(target.attr('day'), 10)||1;
-                            var month = parseInt(target.attr('month'), 10)||1;
-                            var year = parseInt(target.attr('year'), 10)||1;
+                        var day = parseInt(target.attr('day'), 10)||1;
+                        var month = parseInt(target.attr('month'), 10)||1;
+                        var year = parseInt(target.attr('year'), 10)||1;
 
-                            this.element.trigger({
-                                type: 'changeDay',
-                                day: day,
-                                month: month,
-                                year: year,
-                            });
-                        }else if(target.is('.holiday')){
-                            var day = parseInt(target.attr('day'), 10)||1;
-                            var month = parseInt(target.attr('month'), 10)||1;
-                            var year = parseInt(target.attr('year'), 10)||1;
-
-                            this.element.trigger({
-                                type: 'onEvent',
-                                day: day,
-                                month: month,
-                                year: year,
-                            });
-                        }else if(target.is('.today')){
-			                var day = parseInt(target.attr('day'), 10)||1;
-                            var month = parseInt(target.attr('month'), 10)||1;
-                            var year = parseInt(target.attr('year'), 10)||1;
-
-			                this.element.trigger({
-                                type: 'changeDay',
-                                day: day,
-                                month: month,
-                                year: year,
-                            });
-			}
-                        break;
+                        this.element.trigger({
+                            type: 'changeDay',
+                            day: day,
+                            month: month,
+                            year: year,
+                            target: target
+                        });
+                    break;
                     case 'th':
                         if (target.is('.sel')){
                             switch(target.attr("id")){
                                 case 'last':
-                                    this.update_date('prv');
-                                    var prv = new Date(this.yp, this.mm, 1);
-                                    this.live_date = prv;
-                                    this.renderCalendar(prv, this.events);
-                                    this.element.trigger({
-                                        type: 'onPrev',
-                                    });
+                                	if($('.icon-arrow-left').is(":visible")) {
+	                                    this.update_date('prv');
+	                                    var prv = new Date(this.yp, this.mm, 1);
+	                                    this.live_date = prv;
+	                                    this.renderCalendar(prv, this.events);
+	                                    this.element.trigger({
+	                                        type: 'onPrev',
+	                                    });
+                                	}
                                     break;
                                 case 'current':
                                     this.update_date('crt');
@@ -316,13 +374,15 @@
                                     });
                                     break;
                                 case 'next':
-                                    this.update_date('nxt');
-                                    var nxt = new Date(this.yn, this.mm, 1);
-                                    this.live_date = nxt;
-                                    this.renderCalendar(nxt, this.events);
-                                    this.element.trigger({
-                                        type: 'onNext',
-                                    });
+                                	if($('.icon-arrow-right').is(":visible")) {
+	                                    this.update_date('nxt');
+	                                    var nxt = new Date(this.yn, this.mm, 1);
+	                                    this.live_date = nxt;
+	                                    this.renderCalendar(nxt, this.events);
+	                                    this.element.trigger({
+	                                        type: 'onNext',
+	                                    });
+                                	}
                                     break
                             }
                         }
