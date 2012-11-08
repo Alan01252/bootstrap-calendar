@@ -158,7 +158,6 @@
                     .removeClass("day")
                     .addClass('holiday')
                     .empty()
-                    .append('<span class="weekday">' +i+ '</span>')
                     .popover({
                         'title': msg_evnts_hdr,
                         'content': 'You have ' +this.title+ ' appointments',
@@ -269,8 +268,8 @@
                 // Set ID
                 id = "day_" + dow;
 
-                month_ = date.getMonth() + 1;
-                year = date.getFullYear();
+                month_ = mon.getMonth() + 1;
+                year = mon.getFullYear();
                 
   
                 if((dow < this.startDate.getDate()  && this.startDate.getMonth() == mon.getMonth()) ||
@@ -294,14 +293,15 @@
         }
         this.loadEvents();
         this.disablePagination(mon);
+        $(this).trigger('renderFinished');
     };
     
     Plugin.prototype.disablePagination = function (month) {
     	var newDate = new Date(month.getTime());
 
-    	console.log(newDate+" "+this.startDate);
+   
     	
-    	if(newDate < this.startDate){
+    	if(newDate <= this.startDate){
     		$('.calendar .icon-arrow-left').hide();
     	}
     	else {
